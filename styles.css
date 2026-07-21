@@ -42,6 +42,7 @@
   --r-pill:999px;
 
   /* --- border widths --- */
+  --hair:1px;           /* smallest real length (visually-hidden boxes) */
   --bw-hair:1.5px;
   --bw:2px;
   --bw-underline:5px;
@@ -70,6 +71,27 @@
   --s-8:1.8rem;
   --s-9:3rem;
 
+  /* --- empty image-zone placeholder ---
+     The Cerablus mark, tinted brand green over the mint tile. Sizing is keyed
+     to the tile's height so it stays proportional at every card width. */
+  --ph-opacity:.13;
+  --ph-size:auto 44%;
+
+  /* --- sticky chrome ---
+     Sticky offsets must be real lengths, so these are tokens. --header-h is
+     authoritative: .nav enforces it as a min-height, so every header on every
+     page is exactly this tall and .toolbar can dock flush beneath it.
+     --toolbar-h is measured from the rendered toolbar; update it if the
+     toolbar's contents change. */
+  --header-h:75px;
+  --toolbar-h:119px;
+  --stick:calc(var(--header-h) + var(--toolbar-h));
+  --z-header:20;
+  --z-toolbar:15;
+
+  /* --- unavailable items --- */
+  --dim:.45;
+
   /* --- motion --- */
   --t-fast:.2s;
   --t-slow:.35s;
@@ -78,6 +100,13 @@
      Direction C uses flat blocks and a hover lift instead of drop shadows;
      this token exists so future components have one place to pull from. */
   --lift:translateY(-3px);
+
+  /* The mark as a mask image, so its color comes from a brand token rather than
+     being baked into the file. Inlined as a data URI on purpose: browsers treat
+     a file:// page as an opaque origin and refuse an external SVG mask, and this
+     site must work when index.html is double-clicked. Visual source of truth is
+     assets/cerablus-mark.svg — regenerate this if that file changes. */
+--mark-mask:url("data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20158.000000%20229.000000%22%20fill=%22currentColor%22%3E%3Cg%20transform=%22translate(0.000000,229.000000)%20scale(0.100000,-0.100000)%22%20fill=%22currentColor%22%20stroke=%22none%22%3E%20%3Cpath%20d=%22M992%202157%20c-13%20-7%20-33%20-28%20-45%20-47%20-12%20-19%20-30%20-45%20-39%20-59%20-20%20-30%20-38%20-68%20-38%20-82%200%20-5%20-7%20-9%20-15%20-9%20-10%200%20-15%20-10%20-15%20-30%200%20-17%20-9%20-48%20-20%20-70%20-18%20-35%20-23%20-38%20-52%20-34%20-57%207%20-412%2034%20-457%2034%20-34%200%20-49%20-6%20-72%20-29%20-25%20-26%20-29%20-37%20-29%20-85%200%20-51%20-2%20-56%20-25%20-62%20-48%20-12%20-65%20-48%20-65%20-136%200%20-92%209%20-115%2055%20-134%2051%20-21%201049%20-21%201100%200%2046%2019%2055%2042%2055%20133%200%2086%20-13%20117%20-56%20133%20-17%207%20-24%2017%20-24%2035%200%2014%20-10%2036%20-23%2049%20-25%2025%20-53%2031%20-199%2042%20-49%203%20-88%2010%20-88%2015%200%205%207%209%2015%209%209%200%2020%2011%2025%2025%205%2014%2014%2025%2020%2025%205%200%2010%209%2010%2019%200%2010%206%2021%2014%2024%209%203%2012%2014%209%2025%20-3%2012%201%2022%2011%2025%209%204%2016%2016%2016%2027%200%2011%206%2020%2013%2020%207%200%2080%20-43%20162%20-96%20162%20-104%20182%20-109%20210%20-54%2024%2046%2019%2067%20-22%2093%20-79%2049%20-380%20207%20-394%20207%20-8%20-1%20-24%20-6%20-37%20-13z%20m226%20-108%20c92%20-51%20168%20-93%20170%20-94%201%20-1%20-5%20-18%20-15%20-36%20-10%20-19%20-19%20-35%20-20%20-37%20-1%20-2%20-62%2035%20-137%2083%20-85%2055%20-142%2085%20-152%2081%20-8%20-3%20-28%201%20-43%209%20-42%2021%20-46%206%20-9%20-28%2033%20-30%2033%20-30%2010%20-40%20-12%20-6%20-22%20-19%20-22%20-29%200%20-18%20-1%20-19%20-30%20-2%20-42%2025%20-51%208%20-11%20-23%2042%20-33%2023%20-49%20-25%20-21%20-27%2016%20-34%2017%20-34%206%200%20-8%2011%20-21%2025%20-28%2014%20-7%2025%20-20%2025%20-28%200%20-10%20-8%20-9%20-34%208%20-40%2024%20-60%2010%20-22%20-15%2036%20-24%2024%20-41%20-24%20-37%20-22%202%20-40%206%20-40%208%200%203%209%2022%2020%2044%2011%2022%2020%2046%2020%2055%200%208%205%2015%2010%2015%206%200%2010%208%2010%2018%200%209%207%2025%2014%2035%2012%2015%2018%2016%2035%208%2011%20-6%2024%20-11%2030%20-11%2020%200%2011%2020%20-14%2032%20-28%2012%20-33%2036%20-10%2044%208%203%2023%2021%2034%2040%2015%2025%2027%2034%2046%2034%2014%200%20101%20-41%20193%20-91z%20m212%20-142%20c0%20-13%20-9%20-32%20-20%20-42%20-18%20-17%20-20%20-17%20-26%20-1%20-4%2010%20-2%2028%204%2042%2015%2031%2042%2032%2042%201z%22/%3E%20%3Cpath%20d=%22M675%201299%20c-126%20-21%20-235%20-78%20-331%20-173%20-113%20-113%20-164%20-241%20-164%20-411%200%20-169%2050%20-295%20164%20-410%20170%20-172%20440%20-230%20681%20-147%2086%2030%20203%20104%20231%20146%2014%2023%2012%2026%20-51%2086%20-103%2099%20-100%2098%20-143%2058%20-78%20-73%20-165%20-103%20-276%20-96%20-211%2014%20-346%20172%20-334%20391%206%20107%2038%20177%20114%20246%20130%20119%20336%20122%20485%207%20l57%20-44%2083%2079%2084%2079%20-55%2051%20c-128%20118%20-342%20172%20-545%20138z%22/%3E%20%3Cpath%20d=%22M739%20985%20c-90%20-33%20-138%20-86%20-109%20-120%2017%20-20%2032%20-19%2081%207%20116%2060%20234%20-8%20232%20-133%20-2%20-159%20-212%20-217%20-304%20-83%20-32%2047%20-57%2055%20-83%2028%20-20%20-20%20-20%20-22%204%20-86%2044%20-117%20139%20-182%20265%20-182%20124%200%20209%2056%20263%20173%2021%2046%2024%2063%2020%20135%20-5%2093%20-21%20131%20-81%20194%20-70%2072%20-195%20102%20-288%2067z%22/%3E%20%3C/g%3E%3C/svg%3E");
 }
 
 *{margin:0;padding:0;box-sizing:border-box}
@@ -89,8 +118,8 @@ img{max-width:100%;display:block}
 .word{font-family:var(--f-word);font-weight:800;letter-spacing:-.02em}
 
 /* header */
-header{position:sticky;top:0;z-index:20;background:var(--white);border-bottom:var(--bw) solid var(--pine)}
-.nav{display:flex;align-items:center;justify-content:space-between;padding:var(--s-5) 0}
+header{position:sticky;top:0;z-index:var(--z-header);background:var(--white);border-bottom:var(--bw) solid var(--pine)}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:var(--s-5) 0;min-height:calc(var(--header-h) - var(--bw))}
 .logo{display:flex;align-items:center;gap:var(--s-4)}
 .logo .mark{width:var(--mark-size);height:var(--mark-size);border-radius:var(--r-sm);background:var(--green);color:var(--white);display:grid;place-items:center;font-family:var(--f-word);font-weight:800;font-size:1.3rem}
 .logo .mark .cmark{height:var(--mark-glyph);color:var(--white)}
@@ -101,7 +130,7 @@ header{position:sticky;top:0;z-index:20;background:var(--white);border-bottom:va
 /* hero — asymmetric with green block; both columns equal height (stretch) */
 .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(1.6rem,4vw,var(--s-9));align-items:stretch;padding:clamp(2.5rem,6vw,4.5rem) 0}
 .hero .col-text{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;text-align:right}
-.hero .kick{display:inline-block;background:var(--gold);color:var(--pine);font-family:var(--f-ar);font-weight:800;font-size:.85rem;padding:var(--s-2) 1rem;border-radius:var(--r-pill);margin-bottom:var(--s-6)}
+.kick{display:inline-block;background:var(--gold);color:var(--pine);font-family:var(--f-ar);font-weight:800;font-size:.85rem;padding:var(--s-2) 1rem;border-radius:var(--r-pill);margin-bottom:var(--s-6)}
 /* headline + logo lockup read as one tight unit, sharing the right edge (RTL) */
 .hero .headline{display:flex;flex-direction:column;align-items:flex-start;gap:.1rem;margin-bottom:var(--s-1)}
 .hero h1{font-size:clamp(2rem,5.4vw,3.4rem);color:var(--pine);line-height:1.08;margin:0}
@@ -138,16 +167,27 @@ header{position:sticky;top:0;z-index:20;background:var(--white);border-bottom:va
 .card{border:var(--bw) solid var(--mint);border-radius:var(--r-lg);overflow:hidden;transition:var(--t-fast);background:var(--white)}
 .card:hover{border-color:var(--green);transform:var(--lift)}
 .card .top{background:var(--mint);aspect-ratio:16/10;display:grid;place-items:center;font-size:2.6rem;position:relative;overflow:hidden}
-/* real photo fills the tile; mint stays behind as a graceful fallback, badge sits above */
-.card .top img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform var(--t-slow) ease}
+/* Placeholder for an item with no photo: the Cerablus mark, tinted brand green
+   over the mint tile. Every image zone gets it; a real photo simply covers it. */
+.card .top::after{content:"";position:absolute;inset:0;pointer-events:none;background:var(--green);opacity:var(--ph-opacity);
+  -webkit-mask-image:var(--mark-mask);mask-image:var(--mark-mask);
+  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
+  -webkit-mask-position:center;mask-position:center;
+  -webkit-mask-size:var(--ph-size);mask-size:var(--ph-size)}
+/* real photo fills the tile; the placeholder stays behind as a graceful
+   fallback (z-index 1 keeps the photo above it), badge sits above both */
+.card .top img{position:absolute;z-index:1;inset:0;width:100%;height:100%;object-fit:cover;transition:transform var(--t-slow) ease}
 .card:hover .top img{transform:scale(1.05)}
+/* app.js flags an image whose file is missing or misspelled, revealing the
+   placeholder instead of the browser's broken-image icon */
+.card .top img.is-missing{display:none}
 .card .top .fav{position:absolute;z-index:2;inset-block-start:var(--s-4);inset-inline-start:var(--s-4);background:var(--gold);color:var(--pine);font-family:var(--f-ar);font-weight:800;font-size:.65rem;padding:var(--s-1) var(--s-4);border-radius:var(--r-pill)}
 .card .b{padding:var(--s-5) 1rem var(--s-6)}
 .card h3{font-size:1.1rem;color:var(--pine);margin-bottom:var(--s-1)}
 .card p{font-size:.82rem;color:var(--soft);margin-bottom:.7rem;min-height:2.3em}
 .card .r{display:flex;align-items:center;justify-content:space-between}
 .card .price{font-family:var(--f-ar);font-weight:900;color:var(--green);font-size:1.2rem}
-.card .add{background:var(--pine);color:var(--mint);font-family:var(--f-ar);font-weight:700;font-size:.82rem;padding:.45rem var(--s-5);border-radius:var(--r-xs);transition:var(--t-fast)}
+.card .add{border:0;cursor:pointer;background:var(--pine);color:var(--mint);font-family:var(--f-ar);font-weight:700;font-size:.82rem;padding:.45rem var(--s-5);border-radius:var(--r-xs);transition:var(--t-fast)}
 .card .add:hover{background:var(--green)}
 
 /* footer */
@@ -168,3 +208,135 @@ footer .wa{display:inline-flex;align-items:center;gap:var(--s-3);background:var(
 .cmark svg{height:100%;width:auto;display:block}
 .logo-full{line-height:0}
 .logo-full svg{width:100%;height:auto;display:block}
+
+/* ==========================================================================
+   MENU PAGE (menu.html)
+   Extends the landing page's components rather than restating them: the item
+   card reuses .card / .top / .fav / .price / .add from above, and only the
+   states unique to the menu are defined here.
+   ========================================================================== */
+
+/* visually hidden, still read by screen readers */
+.sr-only{position:absolute;width:var(--hair);height:var(--hair);padding:0;margin:calc(var(--hair) * -1);overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+
+/* keyboard focus — never shown for mouse users, always clear for keyboard */
+:focus-visible{outline:var(--bw) solid var(--gold);outline-offset:var(--s-1)}
+
+/* --- header cart button --- */
+.nav-actions{display:flex;align-items:center;gap:var(--s-3)}
+.cart-btn{position:relative;display:inline-grid;place-items:center;flex:0 0 auto;
+  width:var(--mark-size);height:var(--mark-size);border:var(--bw) solid var(--pine);
+  border-radius:var(--r-sm);background:var(--white);color:var(--pine);cursor:pointer;transition:var(--t-fast)}
+.cart-btn:hover{background:var(--pine);color:var(--mint)}
+.cart-btn .i{width:60%;height:60%}
+/* count badge hangs off the outer top corner, mirrored automatically in RTL */
+.cart-btn .count{position:absolute;inset-block-start:calc(var(--s-3) * -1);inset-inline-start:calc(var(--s-3) * -1);
+  min-width:var(--s-8);padding:0 var(--s-1);border-radius:var(--r-pill);
+  background:var(--green);color:var(--white);font-family:var(--f-word);font-weight:700;font-size:.7rem;line-height:var(--s-8)}
+
+/* --- menu intro (shorter than the landing hero so the list starts high) --- */
+.menu-intro{display:flex;flex-direction:column;align-items:flex-start;text-align:right;padding:var(--s-8) 0 var(--s-6)}
+.menu-intro h1{font-size:clamp(2rem,5.4vw,3.4rem);color:var(--pine);line-height:1.08}
+.menu-intro p{color:var(--soft);font-size:1.1rem;max-width:46ch;margin-top:var(--s-3)}
+
+/* --- sticky toolbar: sits directly under the sticky header --- */
+.toolbar{position:sticky;top:var(--header-h);z-index:var(--z-toolbar);
+  background:var(--white);border-bottom:var(--bw) solid var(--mint);padding-block:var(--s-4)}
+
+.search{position:relative;display:flex;align-items:center}
+.search .icon{position:absolute;inset-inline-start:var(--s-5);width:1.15rem;height:1.15rem;color:var(--soft);pointer-events:none}
+.search input{width:100%;font-family:var(--f-body);font-size:1rem;color:var(--ink);
+  background:var(--white);border:var(--bw) solid var(--mint);border-radius:var(--r-md);
+  padding-block:var(--s-4);padding-inline:calc(var(--s-5) * 2 + 1.15rem);transition:var(--t-fast)}
+.search input::placeholder{color:var(--soft)}
+.search input:focus{border-color:var(--green)}
+/* the browser's own search affordances would fight the custom clear button */
+.search input::-webkit-search-cancel-button{display:none}
+/* Step 3 toggles [hidden] on this when the field is empty */
+.search .clear{position:absolute;inset-inline-end:var(--s-4);display:grid;place-items:center;
+  width:var(--s-8);height:var(--s-8);border:0;border-radius:var(--r-pill);
+  background:var(--mint);color:var(--pine);cursor:pointer;transition:var(--t-fast)}
+.search .clear:hover{background:var(--green);color:var(--white)}
+.search .clear svg{width:65%;height:65%}
+.search .clear[hidden]{display:none}
+
+/* --- category chips: swipeable on touch, scrollbar hidden --- */
+.chip-row{display:flex;gap:var(--s-3);margin-top:var(--s-4);
+  overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;
+  -webkit-overflow-scrolling:touch;scroll-snap-type:x proximity}
+.chip-row::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;scroll-snap-align:start;white-space:nowrap;cursor:pointer;
+  font-family:var(--f-ar);font-weight:700;font-size:.85rem;padding:.4rem 1rem;
+  border-radius:var(--r-pill);border:var(--bw-hair) solid var(--tint-line);
+  background:var(--white);color:var(--soft);transition:var(--t-fast)}
+.chip:hover{border-color:var(--green);color:var(--green)}
+.chip.is-active{background:var(--green);color:var(--white);border-color:var(--green)}
+
+/* --- category section --- */
+/* clears the sticky header + toolbar when jumped to via a chip or anchor */
+.cat{scroll-margin-top:calc(var(--stick) + var(--s-6))}
+.cat + .cat{margin-top:var(--s-9)}
+.cat-head{display:flex;align-items:center;gap:var(--s-3);margin-bottom:var(--s-6);
+  font-size:clamp(1.4rem,3.5vw,1.9rem);color:var(--pine)}
+.cat-head .count{font-family:var(--f-word);font-weight:700;font-size:.75rem;color:var(--soft)}
+/* trailing rule, echoing the gold underline on the landing page's headings */
+.cat-head::after{content:"";flex:1;height:var(--bw);background:var(--mint);border-radius:var(--r-pill)}
+
+.menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--card-min),1fr));gap:var(--s-6)}
+
+/* --- item card: extra states on top of the shared .card --- */
+/* Grid items already stretch to equal height; making the card and its body
+   flex columns lets the price row absorb the slack, so the price + "أضف +"
+   rows line up across a row of cards whatever the description length or
+   whether the item has size pills. Scoped to .menu-grid so the landing
+   page's card rendering is untouched. */
+.menu-grid .card{display:flex;flex-direction:column}
+.menu-grid .card .b{display:flex;flex-direction:column;flex:1}
+.menu-grid .card .r{margin-top:auto}
+
+/* "غير متوفر" tag — pine, so it never reads as the gold "مميّز" badge */
+.card .top .tag-out{position:absolute;z-index:2;inset-block-start:var(--s-4);inset-inline-start:var(--s-4);
+  background:var(--pine);color:var(--mint);font-family:var(--f-ar);font-weight:800;
+  font-size:.65rem;padding:var(--s-1) var(--s-4);border-radius:var(--r-pill)}
+
+/* size / variant pills — styled only; Step 4 makes them interactive */
+.sizes{display:flex;gap:var(--s-2);flex-wrap:wrap;margin-bottom:var(--s-4)}
+.size{cursor:pointer;font-family:var(--f-ar);font-weight:700;font-size:.72rem;
+  padding:var(--s-1) var(--s-4);border-radius:var(--r-pill);
+  border:var(--bw-hair) solid var(--tint-line);background:var(--white);color:var(--soft);transition:var(--t-fast)}
+.size:hover{border-color:var(--green);color:var(--green)}
+.size.is-active{background:var(--mint);border-color:var(--green);color:var(--pine)}
+
+/* struck-through previous price — defined for Step 6 (العروض), unused for now */
+.price-old{font-family:var(--f-ar);font-weight:700;font-size:.85rem;color:var(--soft);
+  text-decoration:line-through;margin-inline-start:var(--s-3)}
+
+/* unavailable: dim the content but keep the tag and border legible.
+   Dimming parts rather than the whole card, because opacity on the parent
+   cannot be undone on a child. */
+.card.is-out{border-color:var(--mint)}
+.card.is-out:hover{transform:none;border-color:var(--mint)}
+.card.is-out .top::after{opacity:calc(var(--ph-opacity) / 2)}
+.card.is-out h3,.card.is-out p,.card.is-out .price,.card.is-out .sizes{opacity:var(--dim)}
+.card .add:disabled{background:var(--mint);color:var(--soft);cursor:not-allowed}
+.card .add:disabled:hover{background:var(--mint)}
+
+/* --- mobile: two columns, tighter card typography --- */
+@media(max-width:760px){
+  .menu-grid{grid-template-columns:1fr 1fr;gap:var(--s-4)}
+  .menu-grid .card .b{padding:var(--s-4) var(--s-4) var(--s-5)}
+  .menu-grid .card h3{font-size:.95rem}
+  .menu-grid .card p{font-size:.75rem}
+  .menu-grid .card .price{font-size:1rem}
+  .menu-grid .card .add{font-size:.72rem;padding:var(--s-2) var(--s-4)}
+  .menu-grid .card .r{gap:var(--s-2);flex-wrap:wrap}
+}
+
+/* On narrow screens the logo + cart + CTA no longer fit on one line, and a
+   wrapped header would stand taller than index.html's, breaking both the
+   sticky offset and the "same site" feel. The cart button is the order path on
+   this page (and the footer keeps a WhatsApp CTA), so the header CTA steps
+   aside here only. Keeps every header exactly --header-h tall. */
+@media(max-width:560px){
+  .nav-actions .order-cta{display:none}
+}
