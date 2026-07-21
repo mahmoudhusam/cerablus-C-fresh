@@ -77,7 +77,13 @@ const state = {
   query: ""
 };
 
-/** The menu data, with a precomputed search key per item. */
+/* The menu, read once in init() and held here. Building it normalizes every
+   item's search key, so re-reading it per render would do that work on every
+   keystroke and defeat the cache. Step 7 reassigns this after the Google Sheet
+   loads and calls render() again. */
+let menu = null;
+
+/** Read window.MENU into the shape the renderer wants. */
 function readMenu() {
   const menu = window.MENU || {};
   const items = Array.isArray(menu.items) ? menu.items : [];
@@ -112,7 +118,7 @@ function formatPrice(value, currency) {
  * Apply the active chip and the search box together — both constraints always
  * hold, so searching inside a category narrows rather than resets.
  */
-function filterItems(menu) {
+function filterItems() {
   const query = normalize(state.query);
 
   return menu.items.filter((item) => {
@@ -169,9 +175,10 @@ function buildImageZone(item) {
 
 /**
  * Size pills for a multi-price item. Selecting one updates this card's price
- * only — display logic; the cart reads the selection in Step 4.
+ * and reports the choice back through onSelect, so the card's add button knows
+ * which variant is live without having to read it back out of the DOM.
  */
-function buildSizePills(variants, priceEl, currency) {
+function buildSizePills(variants, priceEl, currency, onSelect) {
   const row = document.createElement("div");
   row.className = "sizes";
 
@@ -191,6 +198,7 @@ function buildSizePills(variants, priceEl, currency) {
       pill.classList.add("is-active");
       pill.setAttribute("aria-pressed", "true");
       priceEl.textContent = formatPrice(variant.price, currency);
+      onSelect(variant);
     });
 
     row.append(pill);
@@ -224,10 +232,19 @@ function buildCard(item, currency) {
   const price = document.createElement("span");
   price.className = "price";
 
+  // The variant this card will add. Size pills reassign it; a single-price item
+  // leaves it null and the add button falls back to item.price.
   const variants = variantsOf(item);
+  let selected = null;
+
   if (variants) {
-    price.textContent = formatPrice(variants[0].price, currency);
-    body.append(buildSizePills(variants, price, currency));
+    selected = variants[0];
+    price.textContent = formatPrice(selected.price, currency);
+    body.append(
+      buildSizePills(variants, price, currency, (variant) => {
+        selected = variant;
+      })
+    );
   } else {
     price.textContent = formatPrice(item.price, currency);
   }
@@ -236,15 +253,20 @@ function buildCard(item, currency) {
   row.className = "r";
   row.append(price);
 
-  // Present but inert this step — the cart lands in Step 4.
   const add = document.createElement("button");
   add.type = "button";
   add.className = "add";
   if (outOfStock) {
+    // A disabled button fires no click, so an unavailable item stays unaddable
+    // even though the handler below is attached to every card the same way.
     add.disabled = true;
     add.textContent = "غير متوفر";
   } else {
     add.textContent = "أضف +";
+    add.addEventListener("click", () => {
+      addToCart(item, selected);
+      flashAdded(add);
+    });
   }
   row.append(add);
 
@@ -310,10 +332,9 @@ function buildEmptyState() {
 function render() {
   const body = document.getElementById("menuBody");
   const status = document.getElementById("resultStatus");
-  if (!body) return;
+  if (!body || !menu) return;
 
-  const menu = readMenu();
-  const visible = filterItems(menu);
+  const visible = filterItems();
   const fragment = document.createDocumentFragment();
 
   if (!visible.length) {
@@ -343,6 +364,309 @@ function render() {
   // Freshly rendered photos may already be in the cache and broken, in which
   // case no error event fires for them — sweep so the placeholder still shows.
   sweepBrokenImages();
+}
+
+/* ==========================================================================
+   CART
+   --------------------------------------------------------------------------
+   State lives here, entirely independent of the DOM, so searching or changing
+   the category chip re-renders the menu without touching the cart. In memory
+   only — no localStorage, so it resets on reload. That is intentional.
+   ========================================================================== */
+
+/**
+ * key -> { id, name, variantLabel, price, qty }
+ * A Map because insertion order is stable, which keeps drawer lines from
+ * jumping around as quantities change.
+ */
+const cart = new Map();
+
+/** Line identity: a large and a small cappuccino are different lines. */
+function lineKey(id, variantLabel) {
+  return `${id}::${variantLabel}`;
+}
+
+/** Human label for a line, used in the drawer and by the reader status. */
+function lineTitle(line) {
+  return line.variantLabel ? `${line.name} (${line.variantLabel})` : line.name;
+}
+
+/** Total quantity and money across the whole cart. */
+function cartTotals() {
+  let count = 0;
+  let total = 0;
+  cart.forEach((line) => {
+    count += line.qty;
+    total += line.price * line.qty;
+  });
+  return { count, total };
+}
+
+/**
+ * Add one of `item` to the cart, at `variant` if the item has sizes.
+ *
+ * The unit price is captured here, at add time, from the variant or from
+ * item.price — both of which are the *live* price. oldPrice (Step 6) is a
+ * display-only field and must never reach the cart.
+ */
+function addToCart(item, variant) {
+  if (item.available === false) return; // belt and braces; the button is disabled
+
+  const variantLabel = variant ? String(variant.label ?? "") : "";
+  const price = Number(variant ? variant.price : item.price);
+  if (!Number.isFinite(price)) return; // a malformed sheet row must not poison the cart
+
+  const key = lineKey(item.id, variantLabel);
+  const existing = cart.get(key);
+
+  if (existing) {
+    existing.qty += 1;
+  } else {
+    cart.set(key, { id: item.id, name: item.name || "", variantLabel, price, qty: 1 });
+  }
+
+  renderCart();
+  announceCart(cart.get(key));
+}
+
+/** Move a line's quantity by delta; hitting zero removes the line outright. */
+function changeQty(key, delta) {
+  const line = cart.get(key);
+  if (!line) return;
+
+  line.qty += delta;
+  if (line.qty <= 0) {
+    cart.delete(key);
+    setCartStatus(`تم حذف ${lineTitle(line)} من السلة`);
+  } else {
+    announceCart(line);
+  }
+  renderCart();
+}
+
+/* --------------------------------------------------------------------------
+   Cart rendering
+   -------------------------------------------------------------------------- */
+
+/** Update the sr-only live region. Visual users read the drawer itself. */
+function setCartStatus(text) {
+  const status = document.getElementById("cartStatus");
+  if (status) status.textContent = text;
+}
+
+function announceCart(line) {
+  if (line) setCartStatus(`${lineTitle(line)} — الكمية ${line.qty}`);
+}
+
+/** Brief pulse on the add button so a tap has an obvious result. */
+function flashAdded(button) {
+  button.classList.remove("is-added");
+  // Reading offsetWidth restarts the animation when the same button is
+  // tapped repeatedly, instead of the class change being coalesced away.
+  void button.offsetWidth;
+  button.classList.add("is-added");
+  window.setTimeout(() => button.classList.remove("is-added"), 400);
+}
+
+/** One row in the drawer: title, stepper, line total. */
+function buildCartLine(key, line, currency) {
+  const row = document.createElement("div");
+  row.className = "cart-line";
+  row.dataset.key = key;
+
+  const info = document.createElement("div");
+  info.className = "cl-info";
+
+  const name = document.createElement("h3");
+  name.className = "cl-name";
+  name.textContent = line.name;
+  info.append(name);
+
+  if (line.variantLabel) {
+    const variant = document.createElement("span");
+    variant.className = "cl-var";
+    variant.textContent = line.variantLabel;
+    info.append(variant);
+  }
+
+  const unit = document.createElement("span");
+  unit.className = "cl-unit";
+  unit.textContent = formatPrice(line.price, currency);
+  info.append(unit);
+
+  row.append(info);
+
+  const side = document.createElement("div");
+  side.className = "cl-side";
+
+  const stepper = document.createElement("div");
+  stepper.className = "qty";
+
+  const title = lineTitle(line);
+  // The − at qty 1 removes the line, so its label says so rather than "إنقاص".
+  const minus = document.createElement("button");
+  minus.type = "button";
+  minus.className = "q";
+  minus.dataset.delta = "-1";
+  minus.textContent = "−";
+  minus.setAttribute("aria-label", line.qty === 1 ? `حذف ${title}` : `إنقاص ${title}`);
+
+  const count = document.createElement("span");
+  count.className = "q-n";
+  count.textContent = String(line.qty);
+
+  const plus = document.createElement("button");
+  plus.type = "button";
+  plus.className = "q";
+  plus.dataset.delta = "1";
+  plus.textContent = "+";
+  plus.setAttribute("aria-label", `زيادة ${title}`);
+
+  stepper.append(minus, count, plus);
+  side.append(stepper);
+
+  const lineTotal = document.createElement("span");
+  lineTotal.className = "cl-total";
+  lineTotal.textContent = formatPrice(line.price * line.qty, currency);
+  side.append(lineTotal);
+
+  row.append(side);
+  return row;
+}
+
+/** The drawer's own empty state, echoing the empty-search treatment. */
+function buildCartEmpty() {
+  const box = document.createElement("div");
+  box.className = "empty empty-cart";
+
+  const glyph = document.createElement("span");
+  glyph.className = "empty-mark";
+  glyph.setAttribute("aria-hidden", "true");
+  box.append(glyph);
+
+  const title = document.createElement("h2");
+  title.textContent = "سلّتك فاضية";
+  box.append(title);
+
+  const hint = document.createElement("p");
+  hint.textContent = "أضف أصنافك من المنيو وبتظهر هون.";
+  box.append(hint);
+
+  return box;
+}
+
+/**
+ * Redraw everything the cart owns: the drawer lines, the running total, the
+ * order button's enabled state, and the header count badge.
+ */
+function renderCart() {
+  const currency = menu ? menu.currency : "₪";
+  const { count, total } = cartTotals();
+
+  const lines = document.getElementById("cartLines");
+  if (lines) {
+    const fragment = document.createDocumentFragment();
+    if (cart.size === 0) {
+      fragment.append(buildCartEmpty());
+    } else {
+      cart.forEach((line, key) => fragment.append(buildCartLine(key, line, currency)));
+    }
+    lines.replaceChildren(fragment);
+  }
+
+  const totalEl = document.getElementById("cartTotal");
+  if (totalEl) totalEl.textContent = formatPrice(total, currency);
+
+  // Step 5 attaches the click; here it only reflects whether ordering is possible.
+  const order = document.getElementById("orderBtn");
+  if (order) {
+    const empty = cart.size === 0;
+    order.classList.toggle("is-disabled", empty);
+    order.setAttribute("aria-disabled", empty ? "true" : "false");
+    // Removing it from the tab order matches how it looks and behaves.
+    if (empty) order.setAttribute("tabindex", "-1");
+    else order.removeAttribute("tabindex");
+  }
+
+  const badge = document.getElementById("cartCount");
+  if (badge) {
+    badge.textContent = String(count);
+    badge.classList.toggle("is-empty", count === 0);
+  }
+
+  const button = document.getElementById("cartBtn");
+  if (button) {
+    button.setAttribute(
+      "aria-label",
+      count === 0 ? "سلة الطلب — فاضية" : `سلة الطلب — ${count} صنف`
+    );
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Cart drawer: open / close, focus management, scroll lock
+   -------------------------------------------------------------------------- */
+
+const FOCUSABLE =
+  'a[href]:not([tabindex="-1"]), button:not([disabled]), input, [tabindex]:not([tabindex="-1"])';
+
+let drawerOpen = false;
+
+function focusablesInDrawer(drawer) {
+  return [...drawer.querySelectorAll(FOCUSABLE)];
+}
+
+function openDrawer() {
+  const drawer = document.getElementById("cartDrawer");
+  const overlay = document.getElementById("cartOverlay");
+  if (!drawer || drawerOpen) return;
+
+  drawerOpen = true;
+  if (overlay) overlay.hidden = false;
+  drawer.classList.add("is-open");
+  drawer.setAttribute("aria-hidden", "false");
+  document.body.classList.add("is-locked");
+
+  // Focus the close button rather than the panel: it is the first control, and
+  // it gives the keyboard user an immediate way back out.
+  const close = document.getElementById("cartClose");
+  if (close) close.focus();
+}
+
+function closeDrawer() {
+  const drawer = document.getElementById("cartDrawer");
+  const overlay = document.getElementById("cartOverlay");
+  if (!drawer || !drawerOpen) return;
+
+  drawerOpen = false;
+  drawer.classList.remove("is-open");
+  drawer.setAttribute("aria-hidden", "true");
+  if (overlay) overlay.hidden = true;
+  document.body.classList.remove("is-locked");
+
+  const button = document.getElementById("cartBtn");
+  if (button) button.focus();
+}
+
+/** Keep Tab inside the drawer while it is open. */
+function trapTab(event, drawer) {
+  const focusables = focusablesInDrawer(drawer);
+  if (!focusables.length) {
+    event.preventDefault();
+    return;
+  }
+
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  const active = document.activeElement;
+
+  if (event.shiftKey && (active === first || !drawer.contains(active))) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -397,11 +721,49 @@ function wireSearch() {
   syncClear();
 }
 
+/** Everything the drawer needs: openers, closers, steppers, focus trap. */
+function wireCart() {
+  const drawer = document.getElementById("cartDrawer");
+  const overlay = document.getElementById("cartOverlay");
+  const openBtn = document.getElementById("cartBtn");
+  const closeBtn = document.getElementById("cartClose");
+  const lines = document.getElementById("cartLines");
+
+  if (openBtn) openBtn.addEventListener("click", openDrawer);
+  if (closeBtn) closeBtn.addEventListener("click", closeDrawer);
+  if (overlay) overlay.addEventListener("click", closeDrawer);
+
+  // Quantity steppers, delegated: the rows are rebuilt on every cart change.
+  if (lines) {
+    lines.addEventListener("click", (event) => {
+      const button = event.target.closest(".q");
+      if (!button || !lines.contains(button)) return;
+
+      const row = button.closest(".cart-line");
+      if (!row) return;
+      changeQty(row.dataset.key, Number(button.dataset.delta));
+    });
+  }
+
+  document.addEventListener("keydown", (event) => {
+    if (!drawerOpen) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeDrawer();
+    } else if (event.key === "Tab" && drawer) {
+      trapTab(event, drawer);
+    }
+  });
+}
+
 function init() {
+  menu = readMenu();
   sweepBrokenImages();
   wireChips();
   wireSearch();
+  wireCart();
   render();
+  renderCart(); // paints the empty state and the zeroed header badge
 }
 
 if (document.readyState === "loading") {

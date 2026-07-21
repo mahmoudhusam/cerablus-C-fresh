@@ -96,6 +96,17 @@
   --body-min:60vh;      /* keeps the footer put when results shrink */
   --empty-mark:64px;
 
+  /* --- cart drawer ---
+     The page is dir="rtl", so the drawer's inline-end edge is the left one and
+     it must slide out to the left. `translate` is physical, so the offset's
+     sign is tokenized here and flipped for LTR below. */
+  --drawer-w:min(420px, 92vw);
+  --drawer-off:-100%;
+  --overlay:rgba(var(--pine-rgb),.45);
+  --qty-btn:30px;
+  --z-overlay:40;
+  --z-drawer:45;
+
   /* --- motion --- */
   --t-fast:.2s;
   --t-slow:.35s;
@@ -342,6 +353,91 @@ footer .wa{display:inline-flex;align-items:center;gap:var(--s-3);background:var(
 .empty h2{font-size:clamp(1.4rem,3.5vw,1.9rem);color:var(--pine)}
 .empty p{color:var(--soft);font-size:.95rem}
 
+/* ==========================================================================
+   CART DRAWER
+   ========================================================================== */
+
+[dir="ltr"]{--drawer-off:100%}
+
+/* background scroll lock while the drawer is open */
+body.is-locked{overflow:hidden}
+
+/* the count badge disappears rather than sitting at a meaningless zero */
+.cart-btn .count.is-empty{display:none}
+
+/* brief pulse confirming a tap landed */
+.card .add.is-added{background:var(--green);animation:add-pulse var(--t-slow) ease}
+@keyframes add-pulse{50%{transform:scale(1.12)}}
+
+.drawer-overlay{position:fixed;inset:0;z-index:var(--z-overlay);background:var(--overlay)}
+.drawer-overlay[hidden]{display:none}
+
+/* Anchored with logical properties so the panel hugs the inline-end edge in
+   either direction; visibility:hidden also takes it out of the tab order when
+   closed, so no focusable child is reachable behind the scenes. */
+.drawer{position:fixed;inset-block:0;inset-inline-end:0;z-index:var(--z-drawer);
+  display:flex;flex-direction:column;width:var(--drawer-w);
+  background:var(--white);border-inline-start:var(--bw) solid var(--pine);
+  border-start-start-radius:var(--r-xl);border-end-start-radius:var(--r-xl);
+  visibility:hidden;translate:var(--drawer-off) 0;
+  transition:translate var(--t-slow) ease,visibility var(--t-slow)}
+.drawer.is-open{visibility:visible;translate:0 0}
+
+.drawer-head{display:flex;align-items:center;justify-content:space-between;gap:var(--s-5);
+  padding:var(--s-6) var(--s-7);border-bottom:var(--bw) solid var(--mint)}
+.drawer-head h2{font-size:1.5rem;color:var(--pine)}
+.drawer-close{display:grid;place-items:center;flex:0 0 auto;
+  width:var(--mark-size);height:var(--mark-size);
+  border:var(--bw) solid var(--pine);border-radius:var(--r-sm);
+  background:var(--white);color:var(--pine);cursor:pointer;transition:var(--t-fast)}
+.drawer-close:hover{background:var(--pine);color:var(--mint)}
+.drawer-close svg{width:55%;height:55%}
+
+/* only the line list scrolls, so the head and the total stay put */
+.drawer-body{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:var(--s-6) var(--s-7)}
+
+.cart-line{display:flex;align-items:center;justify-content:space-between;gap:var(--s-5);
+  padding-block:var(--s-5)}
+.cart-line + .cart-line{border-top:var(--bw-hair) solid var(--mint)}
+.cl-info{min-width:0}
+.cl-name{font-size:1rem;color:var(--pine)}
+.cl-var{display:inline-block;background:var(--mint);color:var(--pine);
+  font-family:var(--f-ar);font-weight:700;font-size:.68rem;
+  padding:var(--s-1) var(--s-4);border-radius:var(--r-pill);margin-top:var(--s-2)}
+.cl-unit{display:block;font-size:.75rem;color:var(--soft)}
+.cl-side{display:flex;align-items:center;gap:var(--s-5);flex:0 0 auto}
+.cl-total{font-family:var(--f-ar);font-weight:900;color:var(--green);font-size:1rem;
+  min-width:5ch;text-align:end}
+
+/* stepper — same pill vocabulary as the size pills */
+.qty{display:flex;align-items:center;gap:var(--s-2);
+  border:var(--bw-hair) solid var(--tint-line);border-radius:var(--r-pill);padding:var(--s-1)}
+.q{width:var(--qty-btn);height:var(--qty-btn);display:grid;place-items:center;
+  border:0;border-radius:var(--r-pill);background:var(--mint);color:var(--pine);
+  font-family:var(--f-ar);font-weight:900;font-size:1rem;line-height:1;
+  cursor:pointer;transition:var(--t-fast)}
+.q:hover{background:var(--green);color:var(--white)}
+.q-n{min-width:2ch;text-align:center;font-family:var(--f-word);font-weight:700;font-size:.9rem}
+
+/* dark green band, echoing the footer */
+.drawer-foot{background:var(--pine);color:var(--mint);padding:var(--s-6) var(--s-7);
+  padding-bottom:max(var(--s-6),env(safe-area-inset-bottom))}
+.drawer-total{display:flex;align-items:center;justify-content:space-between;
+  font-family:var(--f-ar);font-weight:700;margin-bottom:var(--s-5)}
+.drawer-total .total{font-weight:900;font-size:1.4rem;color:var(--gold)}
+/* WhatsApp green is reserved for order actions — this is one */
+.order-btn{display:flex;align-items:center;justify-content:center;gap:var(--s-3);
+  width:100%;background:var(--wa);color:var(--pine);
+  font-family:var(--f-ar);font-weight:800;font-size:1rem;
+  padding:var(--s-5);border-radius:var(--r-md);transition:var(--t-fast)}
+.order-btn svg{width:1.15rem;height:1.15rem}
+.order-btn:hover{filter:brightness(1.06)}
+.order-btn.is-disabled{background:var(--tint-mint-ghost);color:var(--tint-mint-soft);
+  pointer-events:none}
+
+/* the drawer's empty state is the search one, minus the dashed frame */
+.empty-cart{border:0;padding:var(--s-8) var(--s-5)}
+
 /* --- mobile: two columns, tighter card typography --- */
 @media(max-width:760px){
   .menu-grid{grid-template-columns:1fr 1fr;gap:var(--s-4)}
@@ -351,6 +447,13 @@ footer .wa{display:inline-flex;align-items:center;gap:var(--s-3);background:var(
   .menu-grid .card .price{font-size:1rem}
   .menu-grid .card .add{font-size:.72rem;padding:var(--s-2) var(--s-4)}
   .menu-grid .card .r{gap:var(--s-2);flex-wrap:wrap}
+
+  /* drawer: reclaim the horizontal room the stepper and total need */
+  .drawer-head,.drawer-body,.drawer-foot{padding-inline:var(--s-5)}
+  .cart-line{gap:var(--s-3)}
+  .cl-side{gap:var(--s-3)}
+  .cl-name{font-size:.9rem}
+  .cl-total{font-size:.9rem;min-width:4ch}
 }
 
 /* On narrow screens the logo + cart + CTA no longer fit on one line, and a
@@ -373,4 +476,9 @@ footer .wa{display:inline-flex;align-items:center;gap:var(--s-3);background:var(
     scroll-behavior:auto !important}
   .card:hover{transform:none}
   .card:hover .top img{transform:none}
+  /* the add confirmation drops its scale pulse but keeps the color change,
+     so the tap is still acknowledged without any movement */
+  .card .add.is-added{animation:none}
+  /* the drawer appears instead of sliding; it still ends up in place */
+  .drawer{transition:none}
 }
