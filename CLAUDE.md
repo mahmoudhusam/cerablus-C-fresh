@@ -32,7 +32,7 @@ The user drives this step by step. **Do not jump ahead or scaffold future steps.
 - [x] **Step 4** — Cart: add to cart, cart drawer, qty steppers, running total
 - [x] **Step 5** — WhatsApp order builder
 - [x] **Step 6** — العروض (offers) feature
-- [ ] **Step 7** — Google Sheet live loading + fallback
+- [x] **Step 7** — Google Sheet live loading + fallback
 - [ ] **Step 8** — Real content, photos, real WhatsApp number, deploy
 
 ---

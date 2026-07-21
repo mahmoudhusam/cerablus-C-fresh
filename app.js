@@ -3,7 +3,23 @@
    Rendering, search, cart and WhatsApp ordering land here in later steps.
    ========================================================================== */
 
-const CONFIG = { PHONE: "970590000000" }; // placeholder — real number at Step 8
+const CONFIG = {
+  // Placeholder — the café's real number lands at Step 8. Digits only, no +.
+  PHONE: "970590000000",
+
+  /* The client's Google Sheet, published to the web as CSV. Empty until Step 8:
+     while it is empty the site never touches the network and simply renders the
+     copy baked into data/menu.js. */
+  SHEET_CSV_URL: "",
+
+  // Give up on a slow sheet rather than leaving the menu stale-but-loading.
+  SHEET_TIMEOUT_MS: 5000,
+
+  /* A published sheet that parses to almost nothing is far more likely to be
+     broken than to be the real menu, so treat it as a failure and keep the
+     baked-in copy. */
+  SHEET_MIN_ITEMS: 3
+};
 
 /* --------------------------------------------------------------------------
    Missing image photos
@@ -83,19 +99,28 @@ const state = {
    loads and calls render() again. */
 let menu = null;
 
-/** Read window.MENU into the shape the renderer wants. */
-function readMenu() {
-  const menu = window.MENU || {};
-  const items = Array.isArray(menu.items) ? menu.items : [];
+/**
+ * Put a raw menu object — from data/menu.js or from the sheet parser — into the
+ * shape the renderer wants. Both sources go through here, so the sheet can
+ * never produce a menu the renderer treats differently.
+ */
+function decorateMenu(raw) {
+  const source = raw || {};
+  const items = Array.isArray(source.items) ? source.items : [];
   return {
-    currency: menu.currency || "₪",
-    categories: Array.isArray(menu.categories) ? menu.categories : [],
+    currency: source.currency || "₪",
+    categories: Array.isArray(source.categories) ? source.categories : [],
     // Cache the search key once instead of normalizing on every keystroke.
     items: items.map((item) => ({
       ...item,
       searchKey: normalize(`${item.name || ""} ${item.desc || ""}`)
     }))
   };
+}
+
+/** The baked-in menu — the fallback that guarantees the page always renders. */
+function readMenu() {
+  return decorateMenu(window.MENU);
 }
 
 /** Prices for an item, whether it is single-price or has variants. */
@@ -871,6 +896,439 @@ function trapTab(event, drawer) {
   }
 }
 
+/* ==========================================================================
+   GOOGLE SHEET LOADING
+   --------------------------------------------------------------------------
+   The client updates the menu by editing a Google Sheet published as CSV —
+   that is what "منيو قابل للتحديث" means in the contract, and they must never
+   need us to change a price.
+
+   Everything below assumes the file is hostile. It is typed by a non-technical
+   person into a spreadsheet that may be reordered, half-filled, or pasted over.
+   Nothing in here is allowed to throw: the worst outcome is that the whole
+   sheet is rejected and data/menu.js keeps the site running.
+
+   parseSheetCsv() is a pure function — CSV text in, menu object out (or null).
+   It touches no globals and no DOM, so it is testable without a network.
+   ========================================================================== */
+
+/* --- RFC 4180-ish CSV reader ------------------------------------------- */
+
+/**
+ * Split CSV text into rows of fields.
+ *
+ * Handles quoted fields containing commas and newlines, "" as an escaped quote
+ * inside a quoted field, both \r\n and \n line endings, and a leading UTF-8 BOM
+ * (which Google Sheets does emit, and which would otherwise corrupt the very
+ * first header and break column matching entirely).
+ */
+function parseCsv(text) {
+  const source = String(text ?? "").replace(/^﻿/, "");
+  const rows = [];
+  let row = [];
+  let field = "";
+  let inQuotes = false;
+
+  const endField = () => {
+    row.push(field);
+    field = "";
+  };
+  const endRow = () => {
+    endField();
+    rows.push(row);
+    row = [];
+  };
+
+  for (let i = 0; i < source.length; i += 1) {
+    const char = source[i];
+
+    if (inQuotes) {
+      if (char !== '"') {
+        field += char;
+      } else if (source[i + 1] === '"') {
+        field += '"'; // "" inside quotes is a literal quote
+        i += 1;
+      } else {
+        inQuotes = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inQuotes = true;
+    } else if (char === ",") {
+      endField();
+    } else if (char === "\n") {
+      endRow();
+    } else if (char === "\r") {
+      if (source[i + 1] === "\n") i += 1; // swallow the pair
+      endRow();
+    } else {
+      field += char;
+    }
+  }
+
+  // Anything still buffered is a final row with no trailing newline.
+  if (field !== "" || row.length > 0) endRow();
+
+  return rows;
+}
+
+/** True when every cell in the row is blank — a spacer row to skip. */
+function isBlankRow(row) {
+  return row.every((cell) => String(cell ?? "").trim() === "");
+}
+
+/* --- column mapping ----------------------------------------------------- */
+
+/* Canonical key -> the Arabic header from the client intake template. Matching
+   is by name, never position, so the client can reorder columns or add their
+   own notes column without breaking anything. */
+const SHEET_COLUMNS = {
+  cat: "القسم",
+  name: "اسم الصنف",
+  desc: "الوصف",
+  size: "الحجم / النوع",
+  price: "السعر",
+  image: "اسم ملف الصورة",
+  available: "متوفر",
+  featured: "مميّز",
+  offer: "عرض",
+  oldPrice: "السعر القديم"
+};
+
+/* Without these three there is no menu to build. Everything else is optional
+   and falls back to a documented default. */
+const REQUIRED_COLUMNS = ["cat", "name", "price"];
+
+/**
+ * Fold a header cell for matching: the shared Arabic normalizer, then all
+ * whitespace removed — so "الحجم / النوع", "الحجم/النوع" and "الحجم  /  النوع"
+ * are the same column.
+ */
+function normalizeHeader(text) {
+  return normalize(text).replace(/\s+/g, "");
+}
+
+/**
+ * Build { canonicalKey: columnIndex } from the header row.
+ * Returns null if a required column is missing — which invalidates the sheet.
+ */
+function mapSheetColumns(headerRow) {
+  const seen = new Map();
+  headerRow.forEach((cell, index) => {
+    const key = normalizeHeader(cell);
+    // First occurrence wins, so a duplicated header cannot shadow the real one.
+    if (key && !seen.has(key)) seen.set(key, index);
+  });
+
+  const columns = {};
+  Object.entries(SHEET_COLUMNS).forEach(([key, header]) => {
+    const index = seen.get(normalizeHeader(header));
+    if (index !== undefined) columns[key] = index;
+  });
+
+  const missing = REQUIRED_COLUMNS.filter((key) => columns[key] === undefined);
+  if (missing.length) {
+    console.warn(
+      "[cerablus] sheet is missing required columns:",
+      missing.map((key) => SHEET_COLUMNS[key]).join(", ")
+    );
+    return null;
+  }
+
+  return columns;
+}
+
+/** Read a cell by canonical column name, trimmed, defaulting to "". */
+function cell(row, columns, key) {
+  const index = columns[key];
+  if (index === undefined) return "";
+  return String(row[index] ?? "").trim();
+}
+
+/* --- value coercion ----------------------------------------------------- */
+
+/** Arabic-Indic and Persian digits to Western — clients type ٠١٢٣ routinely. */
+function toWesternDigits(text) {
+  return String(text ?? "").replace(/[٠-٩۰-۹]/g, (digit) => {
+    const code = digit.charCodeAt(0);
+    const base = code >= 0x06f0 ? 0x06f0 : 0x0660;
+    return String(code - base);
+  });
+}
+
+/**
+ * Coerce a price cell to a number, or null.
+ *
+ * Strips the things people actually type into a price cell: currency symbols
+ * and words, thousands separators (Western and Arabic), and stray whitespace.
+ * "١٢", "12 ₪", "12₪", "ILS 12", "1,200" and " 12 " all come back as numbers.
+ */
+function parseSheetNumber(value) {
+  let text = toWesternDigits(value).trim();
+  if (!text) return null;
+
+  text = text
+    .replace(/[٬,]/g, "")           // thousands separators
+    .replace(/٫/g, ".")             // Arabic decimal separator
+    .replace(/[₪$€]/g, "")          // currency symbols
+    .replace(/\b(ils|nis|shekels?|شيكل|شواكل)\b/gi, "")
+    .trim();
+
+  if (!text) return null;
+  const number = Number(text);
+  return Number.isFinite(number) ? number : null;
+}
+
+const TRUE_WORDS = new Set(["نعم", "ايوه", "اي", "yes", "y", "true", "1", "✓", "✔", "صح"]);
+const FALSE_WORDS = new Set(["لا", "no", "n", "false", "0", "✗", "✘", "خطا", "غير متوفر"]);
+
+/**
+ * Coerce a yes/no cell. Anything unrecognised — including blank — takes the
+ * caller's default, so a half-filled sheet still produces a usable menu.
+ */
+function parseSheetBoolean(value, fallback) {
+  const text = normalize(toWesternDigits(value));
+  if (!text) return fallback;
+  if (TRUE_WORDS.has(text)) return true;
+  if (FALSE_WORDS.has(text)) return false;
+  return fallback;
+}
+
+/**
+ * Turn a bare filename into a path under assets/menu/.
+ *
+ * The sheet holds a filename, not a path. Anything that looks like a path, a
+ * traversal, or an absolute URL is rejected outright and becomes "" — the card
+ * then renders the branded placeholder, which is a fine outcome and a much
+ * better one than letting a spreadsheet cell point at an arbitrary URL.
+ */
+function parseSheetImage(value) {
+  const name = String(value ?? "").trim();
+  if (!name) return "";
+  if (/[\\/]/.test(name) || name.includes("..") || /^[a-z][a-z0-9+.-]*:/i.test(name)) {
+    console.warn("[cerablus] ignoring suspicious image filename:", name);
+    return "";
+  }
+  return `assets/menu/${name}`;
+}
+
+/* --- identity ----------------------------------------------------------- */
+
+/**
+ * A URL-ish slug from Arabic or Latin text. Letters and numbers survive in any
+ * script; everything else collapses to a hyphen.
+ */
+function slugify(text) {
+  return normalize(text)
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/**
+ * The grouping key for an item: normalized category + normalized name.
+ *
+ * Normalizing means "قهوة" and "قهوه" on two rows are recognised as the same
+ * item rather than silently becoming two, which is exactly the kind of typo a
+ * spreadsheet collects.
+ */
+function sheetGroupKey(catText, nameText) {
+  return `${normalize(catText)}|${normalize(nameText)}`;
+}
+
+/* --- the parser --------------------------------------------------------- */
+
+/**
+ * Parse published-sheet CSV into the window.MENU shape.
+ *
+ * Returns null when the sheet is unusable as a whole (no rows, no header, a
+ * missing required column). Individual bad rows are skipped with a warning
+ * instead — one unparseable price must never cost the café its whole menu.
+ *
+ * The output matches the documented data model exactly, so nothing downstream
+ * needs to know where the menu came from.
+ */
+function parseSheetCsv(csvText, currency = "₪") {
+  const rows = parseCsv(csvText).filter((row) => !isBlankRow(row));
+  if (rows.length < 2) {
+    console.warn("[cerablus] sheet has no data rows");
+    return null;
+  }
+
+  const columns = mapSheetColumns(rows[0]);
+  if (!columns) return null;
+
+  /* Categories in order of FIRST APPEARANCE — that ordering is the client's
+     menu ordering, and it is the only place it is expressed. */
+  const categories = new Map(); // slug -> { id, name }
+  const groups = new Map();     // groupKey -> item under construction
+
+  rows.slice(1).forEach((row, index) => {
+    const sheetRow = index + 2; // 1-based, and the header occupies row 1
+
+    const catText = cell(row, columns, "cat");
+    const nameText = cell(row, columns, "name");
+    const price = parseSheetNumber(cell(row, columns, "price"));
+
+    if (!catText || !nameText || price === null) {
+      console.warn(`[cerablus] skipping sheet row ${sheetRow}: missing category, name or price`);
+      return;
+    }
+
+    const catId = slugify(catText);
+    if (!catId) {
+      console.warn(`[cerablus] skipping sheet row ${sheetRow}: unusable category name`);
+      return;
+    }
+    if (!categories.has(catId)) categories.set(catId, { id: catId, name: catText });
+
+    const key = sheetGroupKey(catText, nameText);
+    const size = cell(row, columns, "size");
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        id: slugify(key),
+        cat: catId,
+        name: nameText,
+        desc: cell(row, columns, "desc"),
+        image: parseSheetImage(cell(row, columns, "image")),
+        // متوفر defaults to TRUE: an item nobody answered for should still sell.
+        available: parseSheetBoolean(cell(row, columns, "available"), true),
+        // مميّز and عرض default to FALSE: a badge must be asked for.
+        featured: parseSheetBoolean(cell(row, columns, "featured"), false),
+        offer: parseSheetBoolean(cell(row, columns, "offer"), false),
+        oldPrice: parseSheetNumber(cell(row, columns, "oldPrice")),
+        rows: []
+      });
+    }
+
+    groups.get(key).rows.push({ sheetRow, size, price });
+  });
+
+  /* Resolve each group into a single-price item or a variant item.
+
+     SIZE CONTRADICTION: when an item's rows disagree — some carry a
+     الحجم / النوع and some are blank — the sized rows win and the blank ones
+     are dropped with a warning. A deliberate size is a stronger signal than an
+     empty cell, and the alternatives are worse: inventing a label for the blank
+     row puts words in the café's mouth, and throwing the sizes away to keep one
+     price loses real menu structure. */
+  const items = [];
+  const usedIds = new Set();
+
+  groups.forEach((group) => {
+    const sized = group.rows.filter((row) => row.size !== "");
+
+    let priced;
+    if (sized.length === 0) {
+      // No sizes anywhere: a single-price item. Extra rows are duplicates.
+      if (group.rows.length > 1) {
+        console.warn(`[cerablus] "${group.name}" repeats with no size; using the first price`);
+      }
+      priced = { price: group.rows[0].price };
+    } else {
+      if (sized.length !== group.rows.length) {
+        const dropped = group.rows.filter((row) => row.size === "").map((row) => row.sheetRow);
+        console.warn(
+          `[cerablus] "${group.name}" mixes sized and unsized rows; ignoring row(s) ${dropped.join(", ")}`
+        );
+      }
+      priced = { variants: sized.map((row) => ({ label: row.size, price: row.price })) };
+    }
+
+    /* Ids must be stable across reloads because the cart keys off them, so they
+       are derived from category + name, never from a row index — inserting a
+       row at the top of the sheet must not reshuffle every id. Two different
+       groups can still collapse to the same slug if they differ only in
+       punctuation, so uniqueness is enforced here in first-appearance order. */
+    let id = group.id || "item";
+    if (usedIds.has(id)) {
+      let suffix = 2;
+      while (usedIds.has(`${id}-${suffix}`)) suffix += 1;
+      console.warn(`[cerablus] duplicate id "${id}" for "${group.name}"; using "${id}-${suffix}"`);
+      id = `${id}-${suffix}`;
+    }
+    usedIds.add(id);
+
+    items.push({
+      id,
+      cat: group.cat,
+      name: group.name,
+      desc: group.desc,
+      ...priced, // exactly one of price / variants, never both
+      image: group.image,
+      available: group.available,
+      featured: group.featured,
+      offer: group.offer,
+      oldPrice: group.oldPrice
+    });
+  });
+
+  if (!items.length) {
+    console.warn("[cerablus] sheet produced no valid items");
+    return null;
+  }
+
+  return { currency, categories: [...categories.values()], items };
+}
+
+/* --- the loader --------------------------------------------------------- */
+
+/**
+ * Swap in a freshly parsed menu.
+ *
+ * The cart is deliberately NOT touched. Its lines already captured their prices
+ * at add time, and silently repricing a customer's cart underneath them — or
+ * dropping a line because the sheet renamed an item — is far worse than a brief
+ * inconsistency that resolves the moment they reload. renderCart() still runs,
+ * so the wa.me href is rebuilt and cannot go stale against the new currency.
+ *
+ * state.cat and state.query are untouched, so the active chip and whatever the
+ * customer has typed both survive the re-render.
+ */
+function applySheetMenu(parsed) {
+  menu = decorateMenu(parsed);
+  render();
+  renderCart();
+}
+
+/**
+ * Fetch the published sheet and, if everything about it checks out, use it.
+ *
+ * Every failure path ends the same way: warn for us, and leave the baked-in
+ * menu exactly as it is for the customer. Nothing here is awaited by the
+ * initial render, so a slow or dead sheet costs the visitor nothing.
+ */
+async function loadSheetMenu() {
+  const url = CONFIG.SHEET_CSV_URL;
+  if (!url) return; // not configured yet — no fetch, no noise
+
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), CONFIG.SHEET_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal, cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const text = await response.text();
+    if (!text || !text.trim()) throw new Error("empty response");
+
+    const parsed = parseSheetCsv(text, menu ? menu.currency : "₪");
+    if (!parsed) throw new Error("could not parse the sheet");
+    if (parsed.items.length < CONFIG.SHEET_MIN_ITEMS) {
+      throw new Error(`only ${parsed.items.length} valid item(s); expected at least ${CONFIG.SHEET_MIN_ITEMS}`);
+    }
+
+    applySheetMenu(parsed);
+  } catch (error) {
+    // Deliberately silent for the visitor: the baked-in menu is already on screen.
+    console.warn("[cerablus] using the baked-in menu —", error && error.message);
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 /* --------------------------------------------------------------------------
    Wiring
    -------------------------------------------------------------------------- */
@@ -966,6 +1424,11 @@ function init() {
   wireCart();
   render();
   renderCart(); // paints the empty state and the zeroed header badge
+
+  /* The baked-in menu is on screen by now. Go looking for a fresher one in the
+     background — deliberately not awaited, so the customer never waits on the
+     network and never sees a spinner. */
+  loadSheetMenu();
 }
 
 if (document.readyState === "loading") {

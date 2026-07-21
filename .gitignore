@@ -1,0 +1,10 @@
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Not used by this project (no build step) — listed so a stray install
+# can never get committed
+node_modules/
+
+# Per-machine Claude Code settings
+.claude/settings.local.json
