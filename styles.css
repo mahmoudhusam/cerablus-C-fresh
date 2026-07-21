@@ -1,0 +1,170 @@
+/* ==========================================================================
+   Cerablus Coffee — shared styles
+   Design direction C ("العصري"). Every design token lives in the :root block
+   below; nothing further down this file should contain a raw hex or px value.
+   ========================================================================== */
+
+:root{
+  /* --- brand colors --- */
+  --pine:#0c3d26;          /* primary dark green */
+  --green:#006639;         /* secondary / action green */
+  --gold:#cda05f;          /* accent — used sparingly */
+  --mint:#e9f4ee;          /* light tint */
+  --white:#ffffff;         /* page base */
+  --wa:#25D366;            /* WhatsApp green — reserved for order actions */
+
+  /* --- semantic colors --- */
+  --ink:var(--pine);       /* body text */
+  --soft:#5b6f64;          /* muted / secondary text */
+
+  /* --- translucent brand tints (rgb triplets so alpha can vary) --- */
+  --pine-rgb:12,61,38;
+  --mint-rgb:233,244,238;
+  --gold-rgb:205,160,95;
+  --tint-line:rgba(var(--pine-rgb),.15);     /* hairline borders on light bg */
+  --tint-mint-soft:rgba(var(--mint-rgb),.7); /* muted text on dark green */
+  --tint-mint-ghost:rgba(var(--mint-rgb),.16);
+  --tint-mint-faint:rgba(var(--mint-rgb),.14);
+  --tint-gold-soft:rgba(var(--gold-rgb),.25);
+
+  /* --- type --- */
+  --f-ar:"Cairo",sans-serif;                  /* Arabic display / headings */
+  --f-body:"IBM Plex Sans Arabic",sans-serif; /* Arabic body */
+  --f-word:"Sora",sans-serif;                 /* Latin wordmark / display */
+
+  /* --- radii --- */
+  --r-xs:9px;
+  --r-sm:10px;
+  --r-md:12px;
+  --r-lg:18px;
+  --r-xl:20px;
+  --r-2xl:28px;
+  --r-pill:999px;
+
+  /* --- border widths --- */
+  --bw-hair:1.5px;
+  --bw:2px;
+  --bw-underline:5px;
+
+  /* --- layout --- */
+  --wrap-max:1140px;      /* content column */
+  --wrap-gutter:2.4rem;   /* total horizontal gutter */
+  --card-min:240px;       /* menu grid track minimum */
+  --mark-size:40px;       /* header logo tile */
+  --mark-glyph:26px;      /* logo glyph inside that tile */
+  --mark-glyph-lg:36px;   /* logo glyph in the footer */
+  --lockup-max:430px;     /* hero wordmark lockup */
+  --hero-art-max:440px;   /* hero green block height cap */
+  --hero-art-mobile:380px;/* hero green block width cap on mobile */
+  --dot:120px;            /* decorative circle in the hero block */
+  --dot-offset:-30px;
+
+  /* --- spacing scale --- */
+  --s-1:.2rem;
+  --s-2:.35rem;
+  --s-3:.5rem;
+  --s-4:.6rem;
+  --s-5:.9rem;
+  --s-6:1.1rem;
+  --s-7:1.4rem;
+  --s-8:1.8rem;
+  --s-9:3rem;
+
+  /* --- motion --- */
+  --t-fast:.2s;
+  --t-slow:.35s;
+
+  /* --- elevation ---
+     Direction C uses flat blocks and a hover lift instead of drop shadows;
+     this token exists so future components have one place to pull from. */
+  --lift:translateY(-3px);
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--f-body);color:var(--ink);background:var(--white);line-height:1.7;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--f-ar);line-height:1.15}
+a{text-decoration:none;color:inherit}
+img{max-width:100%;display:block}
+.wrap{width:min(100% - var(--wrap-gutter),var(--wrap-max));margin-inline:auto}
+.word{font-family:var(--f-word);font-weight:800;letter-spacing:-.02em}
+
+/* header */
+header{position:sticky;top:0;z-index:20;background:var(--white);border-bottom:var(--bw) solid var(--pine)}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:var(--s-5) 0}
+.logo{display:flex;align-items:center;gap:var(--s-4)}
+.logo .mark{width:var(--mark-size);height:var(--mark-size);border-radius:var(--r-sm);background:var(--green);color:var(--white);display:grid;place-items:center;font-family:var(--f-word);font-weight:800;font-size:1.3rem}
+.logo .mark .cmark{height:var(--mark-glyph);color:var(--white)}
+.logo .name{font-family:var(--f-word);font-weight:800;font-size:1.3rem;color:var(--pine)}
+.order-cta{background:var(--pine);color:var(--mint);padding:var(--s-4) 1.3rem;border-radius:var(--r-sm);font-family:var(--f-ar);font-weight:700;font-size:.92rem;transition:var(--t-fast)}
+.order-cta:hover{background:var(--green)}
+
+/* hero — asymmetric with green block; both columns equal height (stretch) */
+.hero{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(1.6rem,4vw,var(--s-9));align-items:stretch;padding:clamp(2.5rem,6vw,4.5rem) 0}
+.hero .col-text{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;text-align:right}
+.hero .kick{display:inline-block;background:var(--gold);color:var(--pine);font-family:var(--f-ar);font-weight:800;font-size:.85rem;padding:var(--s-2) 1rem;border-radius:var(--r-pill);margin-bottom:var(--s-6)}
+/* headline + logo lockup read as one tight unit, sharing the right edge (RTL) */
+.hero .headline{display:flex;flex-direction:column;align-items:flex-start;gap:.1rem;margin-bottom:var(--s-1)}
+.hero h1{font-size:clamp(2rem,5.4vw,3.4rem);color:var(--pine);line-height:1.08;margin:0}
+.hero h1 .g{color:var(--green)}
+.hero .lockup{width:min(var(--lockup-max),90%);color:var(--pine);margin:-.1rem 0 0}
+.hero .word-xl{font-family:var(--f-word);font-weight:800;font-size:clamp(var(--s-9),8vw,5.5rem);color:var(--pine);line-height:.95;letter-spacing:-.03em}
+.hero p{color:var(--soft);font-size:1.1rem;max-width:40ch;margin:1.3rem 0 var(--s-8)}
+.actions{display:flex;gap:.7rem;flex-wrap:wrap}
+.btn-green{background:var(--green);color:var(--white);padding:var(--s-5) var(--s-8);border-radius:var(--r-md);font-family:var(--f-ar);font-weight:800;transition:var(--t-fast)}
+.btn-green:hover{background:var(--pine)}
+.btn-ghost{border:var(--bw) solid var(--pine);color:var(--pine);padding:var(--s-5) var(--s-8);border-radius:var(--r-md);font-family:var(--f-ar);font-weight:800;transition:var(--t-fast)}
+.btn-ghost:hover{background:var(--pine);color:var(--mint)}
+.hero-art{border-radius:var(--r-2xl);background:
+  linear-gradient(135deg,var(--green),var(--pine));
+  position:relative;overflow:hidden;display:grid;place-items:center;min-height:min(78vw,var(--hero-art-max))}
+.hero-art .big{font-family:var(--f-word);font-weight:800;font-size:clamp(4rem,12vw,8rem);color:var(--tint-mint-faint)}
+.hero-art .logo-full{width:46%;color:var(--tint-mint-ghost)}
+.hero-art .badge{position:absolute;inset-block-end:1.2rem;inset-inline-start:1.2rem;background:var(--gold);color:var(--pine);font-family:var(--f-ar);font-weight:800;padding:var(--s-3) var(--s-6);border-radius:var(--r-pill);font-size:.9rem}
+.hero-art .dot{position:absolute;width:var(--dot);height:var(--dot);border-radius:50%;background:var(--tint-gold-soft);inset-block-start:var(--dot-offset);inset-inline-end:var(--dot-offset)}
+
+/* strip */
+.strip{background:var(--pine);color:var(--mint);border-radius:var(--r-xl);display:flex;justify-content:space-around;flex-wrap:wrap;gap:1rem;padding:var(--s-7);text-align:center;font-family:var(--f-ar);font-weight:700}
+.strip span{color:var(--gold)}
+
+/* menu */
+.section{padding:clamp(2.5rem,7vw,4.5rem) 0}
+.sec-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:var(--s-8);flex-wrap:wrap}
+.sec-head h2{font-size:clamp(1.9rem,4.5vw,2.8rem);color:var(--pine)}
+.sec-head h2 .u{border-bottom:var(--bw-underline) solid var(--gold);padding-bottom:var(--bw)}
+.chips{display:flex;gap:var(--s-3);flex-wrap:wrap}
+.chips span{font-family:var(--f-ar);font-weight:700;font-size:.85rem;padding:.4rem 1rem;border-radius:var(--r-pill);border:var(--bw-hair) solid var(--tint-line);color:var(--soft)}
+.chips span.on{background:var(--green);color:var(--white);border-color:var(--green)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--card-min),1fr));gap:var(--s-6)}
+.card{border:var(--bw) solid var(--mint);border-radius:var(--r-lg);overflow:hidden;transition:var(--t-fast);background:var(--white)}
+.card:hover{border-color:var(--green);transform:var(--lift)}
+.card .top{background:var(--mint);aspect-ratio:16/10;display:grid;place-items:center;font-size:2.6rem;position:relative;overflow:hidden}
+/* real photo fills the tile; mint stays behind as a graceful fallback, badge sits above */
+.card .top img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform var(--t-slow) ease}
+.card:hover .top img{transform:scale(1.05)}
+.card .top .fav{position:absolute;z-index:2;inset-block-start:var(--s-4);inset-inline-start:var(--s-4);background:var(--gold);color:var(--pine);font-family:var(--f-ar);font-weight:800;font-size:.65rem;padding:var(--s-1) var(--s-4);border-radius:var(--r-pill)}
+.card .b{padding:var(--s-5) 1rem var(--s-6)}
+.card h3{font-size:1.1rem;color:var(--pine);margin-bottom:var(--s-1)}
+.card p{font-size:.82rem;color:var(--soft);margin-bottom:.7rem;min-height:2.3em}
+.card .r{display:flex;align-items:center;justify-content:space-between}
+.card .price{font-family:var(--f-ar);font-weight:900;color:var(--green);font-size:1.2rem}
+.card .add{background:var(--pine);color:var(--mint);font-family:var(--f-ar);font-weight:700;font-size:.82rem;padding:.45rem var(--s-5);border-radius:var(--r-xs);transition:var(--t-fast)}
+.card .add:hover{background:var(--green)}
+
+/* footer */
+footer{background:var(--pine);color:var(--mint);padding:var(--s-9) 0 2rem;text-align:center;margin-top:2rem}
+/* the footer wordmark sits inline with the cup glyph */
+footer .word{font-size:2.2rem;color:var(--white);margin-bottom:.3rem;display:inline-flex;align-items:center;gap:var(--s-4);justify-content:center}
+footer .word b{color:var(--gold)}
+footer .word .cmark{height:var(--mark-glyph-lg);color:var(--gold)}
+footer .meta{color:var(--tint-mint-soft);font-size:.9rem;margin-bottom:1.2rem}
+footer .wa{display:inline-flex;align-items:center;gap:var(--s-3);background:var(--gold);color:var(--pine);padding:.8rem 1.7rem;border-radius:var(--r-md);font-family:var(--f-ar);font-weight:800}
+
+/* NOTE: media query conditions cannot read CSS custom properties, so this
+   breakpoint stays a literal value. It matches --hero-art-mobile's context. */
+@media(max-width:760px){.hero{grid-template-columns:1fr;gap:1.6rem}.hero .col-text{justify-content:flex-start}.hero-art{aspect-ratio:1;min-height:0;width:100%;max-width:var(--hero-art-mobile)}}
+
+/* --- real Cerablus logo --- */
+.cmark{display:inline-flex;line-height:0}
+.cmark svg{height:100%;width:auto;display:block}
+.logo-full{line-height:0}
+.logo-full svg{width:100%;height:auto;display:block}
