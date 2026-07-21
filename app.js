@@ -114,16 +114,31 @@ function formatPrice(value, currency) {
    Filtering
    -------------------------------------------------------------------------- */
 
+/* Chips that filter on an item flag instead of a category id, mapped to the
+   flag they test. Their results span categories, which is also what decides
+   whether category headings are worth showing. Adding a flag chip means adding
+   a button in menu.html and one entry here — nothing else. */
+const FLAG_CHIPS = {
+  featured: "featured",
+  offers: "offer"
+};
+
+/** True for chips whose results are drawn from more than one category. */
+function isFlagChip(cat) {
+  return Object.prototype.hasOwnProperty.call(FLAG_CHIPS, cat);
+}
+
 /**
  * Apply the active chip and the search box together — both constraints always
  * hold, so searching inside a category narrows rather than resets.
  */
 function filterItems() {
   const query = normalize(state.query);
+  const flag = FLAG_CHIPS[state.cat];
 
   return menu.items.filter((item) => {
-    if (state.cat === "featured") {
-      if (item.featured !== true) return false;
+    if (flag) {
+      if (item[flag] !== true) return false;
     } else if (state.cat !== "all") {
       if (item.cat !== state.cat) return false;
     }
@@ -139,6 +154,44 @@ function filterItems() {
    text will eventually come from a Google Sheet edited by the client, and
    textContent makes any markup in it inert by construction.
    -------------------------------------------------------------------------- */
+
+/**
+ * The one badge a card gets, in strict priority order:
+ *
+ *   1. غير متوفر — the most actionable fact; nothing else matters if you
+ *      cannot order it.
+ *   2. عرض       — an offer the customer can act on right now.
+ *   3. مميّز      — nice to know, and the one worth losing.
+ *
+ * Kept as a single ordered decision rather than stacked conditions, so the
+ * precedence is legible in one place and cannot drift.
+ */
+function badgeFor(item) {
+  if (item.available === false) return { className: "tag-out", text: "غير متوفر" };
+  if (item.offer === true) return { className: "tag-offer", text: "عرض" };
+  if (item.featured === true) return { className: "fav", text: "مميّز" };
+  return null;
+}
+
+/**
+ * The old price to strike through beside the live one, or null for "render
+ * nothing extra".
+ *
+ * Defensive on purpose: from Step 7 this field is typed into a spreadsheet by a
+ * non-technical person, so it arrives missing, blank, as a string, or as a
+ * number that makes no sense next to the live price. Number() handles the
+ * numeric-string case; everything else falls through to null silently, because
+ * a customer must never see a warning and a bad cell must never break a card.
+ */
+function oldPriceFor(item, livePrice) {
+  if (item.offer !== true) return null;
+
+  const previous = Number(item.oldPrice);
+  if (!Number.isFinite(previous) || !Number.isFinite(livePrice)) return null;
+
+  // An "old" price at or below what you pay today is not a discount.
+  return previous > livePrice ? previous : null;
+}
 
 /** The image zone: a real photo when we have one, the branded tile otherwise. */
 function buildImageZone(item) {
@@ -157,17 +210,13 @@ function buildImageZone(item) {
     top.append(img);
   }
 
-  // At most one badge, so "مميّز" and "غير متوفر" never stack in the corner.
-  if (item.available === false) {
+  // Exactly one badge; they all occupy the same corner. See badgeFor().
+  const badge = badgeFor(item);
+  if (badge) {
     const tag = document.createElement("span");
-    tag.className = "tag-out";
-    tag.textContent = "غير متوفر";
+    tag.className = badge.className;
+    tag.textContent = badge.text;
     top.append(tag);
-  } else if (item.featured === true) {
-    const fav = document.createElement("span");
-    fav.className = "fav";
-    fav.textContent = "مميّز";
-    top.append(fav);
   }
 
   return top;
@@ -228,9 +277,15 @@ function buildCard(item, currency) {
   desc.textContent = item.desc || "";
   body.append(desc);
 
-  // The price element is created before the pills so they can drive it.
+  // The price element is created before the pills so they can drive it. The
+  // wrapper keeps the live price and any struck-through old price together as
+  // one unit inside the flex row.
+  const priceWrap = document.createElement("div");
+  priceWrap.className = "price-wrap";
+
   const price = document.createElement("span");
   price.className = "price";
+  priceWrap.append(price);
 
   // The variant this card will add. Size pills reassign it; a single-price item
   // leaves it null and the add button falls back to item.price.
@@ -249,9 +304,38 @@ function buildCard(item, currency) {
     price.textContent = formatPrice(item.price, currency);
   }
 
+  /* Struck-through old price.
+     ------------------------------------------------------------------------
+     VARIANTS + OFFERS: skipped entirely for an item with sizes.
+     The data model carries one oldPrice per item, but a multi-size item has
+     several live prices, and there is no way to tell which one that single
+     number was the "before" of. Pairing it with whichever pill happens to be
+     selected would misstate the discount every time it is not that size —
+     showing "16 ₪" struck beside a 10 ₪ small implies a saving the café never
+     offered. So a multi-size item still gets its عرض badge, and simply shows
+     no strikethrough. If per-size offers are ever needed, the sheet can carry
+     them as separate rows with their own oldPrice. */
+  if (!variants) {
+    const previous = oldPriceFor(item, Number(item.price));
+    if (previous !== null) {
+      const del = document.createElement("del");
+      del.className = "price-old";
+
+      // <del> alone announces only "deletion"; name what the number is.
+      const label = document.createElement("span");
+      label.className = "sr-only";
+      label.textContent = "السعر القديم ";
+      del.append(label);
+
+      // Same formatPrice() as everywhere else — one formatting path.
+      del.append(document.createTextNode(formatPrice(previous, currency)));
+      priceWrap.append(del);
+    }
+  }
+
   const row = document.createElement("div");
   row.className = "r";
-  row.append(price);
+  row.append(priceWrap);
 
   const add = document.createElement("button");
   add.type = "button";
@@ -341,9 +425,10 @@ function render() {
     fragment.append(buildEmptyState());
   } else {
     // A single active category chip already names the section, so its heading
-    // would just repeat the chip. Headings stay for الكل and الأكثر طلبًا,
-    // where results span several categories and the grouping carries meaning.
-    const showHeadings = state.cat === "all" || state.cat === "featured";
+    // would just repeat the chip. Headings stay for الكل and for the flag chips
+    // (الأكثر طلبًا, العروض), whose results span several categories and so keep
+    // the grouping meaningful.
+    const showHeadings = state.cat === "all" || isFlagChip(state.cat);
 
     menu.categories.forEach((category) => {
       const inCategory = visible.filter((item) => item.cat === category.id);

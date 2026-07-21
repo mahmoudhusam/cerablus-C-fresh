@@ -322,9 +322,18 @@ footer .wa{display:inline-flex;align-items:center;gap:var(--s-3);background:var(
 .size:hover{border-color:var(--green);color:var(--green)}
 .size.is-active{background:var(--mint);border-color:var(--green);color:var(--pine)}
 
-/* struck-through previous price — defined for Step 6 (العروض), unused for now */
+/* "عرض" badge — solid green against the gold "مميّز", so the two are never
+   confused at a glance even though they share the same corner. */
+.card .top .tag-offer{position:absolute;z-index:2;inset-block-start:var(--s-4);inset-inline-start:var(--s-4);
+  background:var(--green);color:var(--white);font-family:var(--f-ar);font-weight:800;
+  font-size:.65rem;padding:var(--s-1) var(--s-4);border-radius:var(--r-pill)}
+
+/* live price and any struck-through old price travel together as one flex item */
+.price-wrap{display:flex;align-items:baseline;flex-wrap:wrap;gap:var(--s-3);min-width:0}
+
+/* struck-through previous price */
 .price-old{font-family:var(--f-ar);font-weight:700;font-size:.85rem;color:var(--soft);
-  text-decoration:line-through;margin-inline-start:var(--s-3)}
+  text-decoration:line-through}
 
 /* unavailable: dim the content but keep the tag and border legible.
    Dimming parts rather than the whole card, because opacity on the parent
@@ -332,7 +341,7 @@ footer .wa{display:inline-flex;align-items:center;gap:var(--s-3);background:var(
 .card.is-out{border-color:var(--mint)}
 .card.is-out:hover{transform:none;border-color:var(--mint)}
 .card.is-out .top::after{opacity:calc(var(--ph-opacity) / 2)}
-.card.is-out h3,.card.is-out p,.card.is-out .price,.card.is-out .sizes{opacity:var(--dim)}
+.card.is-out h3,.card.is-out p,.card.is-out .price,.card.is-out .price-old,.card.is-out .sizes{opacity:var(--dim)}
 .card .add:disabled{background:var(--mint);color:var(--soft);cursor:not-allowed}
 .card .add:disabled:hover{background:var(--mint)}
 
@@ -445,6 +454,8 @@ body.is-locked{overflow:hidden}
   .menu-grid .card h3{font-size:.95rem}
   .menu-grid .card p{font-size:.75rem}
   .menu-grid .card .price{font-size:1rem}
+  .menu-grid .card .price-old{font-size:.72rem}
+  .menu-grid .card .price-wrap{gap:var(--s-2)}
   .menu-grid .card .add{font-size:.72rem;padding:var(--s-2) var(--s-4)}
   .menu-grid .card .r{gap:var(--s-2);flex-wrap:wrap}
 
