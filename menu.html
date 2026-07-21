@@ -70,80 +70,25 @@ fill="currentColor" stroke="none">
       <label class="sr-only" for="searchInput">ابحث في المنيو</label>
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
       <input id="searchInput" type="search" placeholder="ابحث عن صنف…" autocomplete="off">
-      <button class="clear" type="button" aria-label="مسح البحث"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6 18 18M18 6 6 18"/></svg></button>
+      <button class="clear" id="searchClear" type="button" aria-label="مسح البحث" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6 18 18M18 6 6 18"/></svg></button>
     </div>
     <nav class="chip-row" id="catNav" aria-label="أقسام المنيو">
-        <button class="chip is-active" type="button" data-cat="all" aria-current="true">الكل</button>
-        <button class="chip" type="button" data-cat="featured">الأكثر طلبًا</button>
-        <button class="chip" type="button" data-cat="hot">مشروبات ساخنة</button>
-        <button class="chip" type="button" data-cat="cold">مشروبات باردة</button>
-        <button class="chip" type="button" data-cat="sweets">حلويات</button>
-        <button class="chip" type="button" data-cat="food">مأكولات خفيفة</button>
+        <button class="chip is-active" type="button" data-cat="all" aria-pressed="true">الكل</button>
+        <button class="chip" type="button" data-cat="featured" aria-pressed="false">الأكثر طلبًا</button>
+        <button class="chip" type="button" data-cat="hot" aria-pressed="false">مشروبات ساخنة</button>
+        <button class="chip" type="button" data-cat="cold" aria-pressed="false">مشروبات باردة</button>
+        <button class="chip" type="button" data-cat="sweets" aria-pressed="false">حلويات</button>
+        <button class="chip" type="button" data-cat="food" aria-pressed="false">مأكولات خفيفة</button>
     </nav>
   </div>
 </div>
 
 <main class="wrap section" id="menuBody">
-
-  <!-- ==================================================================
-       TEMPORARY SCAFFOLDING — DELETE IN STEP 3
-       Hand-written demo category exercising every card state (featured,
-       plain, size pills, unavailable, placeholder image zone). Step 3
-       renders real categories from data/menu.js into #menuBody instead.
-       ================================================================== -->
-  <section class="cat" id="cat-hot">
-    <h2 class="cat-head">مشروبات ساخنة <span class="count">4</span></h2>
-    <div class="menu-grid">
-      <article class="card">
-        <div class="top"><span class="fav">مميّز</span></div>
-        <div class="b">
-          <h3>كابتشينو</h3>
-          <p>إسبريسو مع رغوة حليب كثيفة.</p>
-        <div class="sizes"><button class="size is-active" type="button" aria-pressed="true">صغير</button><button class="size" type="button" aria-pressed="false">كبير</button></div>
-          <div class="r">
-            <span class="price">13 ₪</span>
-            <button class="add" type="button">أضف +</button>
-          </div>
-        </div>
-      </article>
-      <article class="card">
-        <div class="top"><span class="fav">مميّز</span></div>
-        <div class="b">
-          <h3>قهوة عربية</h3>
-          <p>قهوة عربية أصيلة بالهيل.</p>
-          <div class="r">
-            <span class="price">8 ₪</span>
-            <button class="add" type="button">أضف +</button>
-          </div>
-        </div>
-      </article>
-      <article class="card">
-        <div class="top"></div>
-        <div class="b">
-          <h3>لاتيه</h3>
-          <p>حليب مخفوق ناعم فوق إسبريسو.</p>
-          <div class="r">
-            <span class="price">12 ₪</span>
-            <button class="add" type="button">أضف +</button>
-          </div>
-        </div>
-      </article>
-      <article class="card is-out">
-        <div class="top"><span class="tag-out">غير متوفر</span></div>
-        <div class="b">
-          <h3>سحلب</h3>
-          <p>سحلب بالقرفة والمكسّرات.</p>
-          <div class="r">
-            <span class="price">12 ₪</span>
-            <button class="add" type="button" disabled>غير متوفر</button>
-          </div>
-        </div>
-      </article>
-    </div>
-  </section>
-  <!-- ================= END TEMPORARY SCAFFOLDING ===================== -->
-
+  <!-- Filled by app.js from window.MENU. Never hardcode items here. -->
 </main>
+
+<!-- Result count for screen readers; the visual count lives in each category head. -->
+<p class="sr-only" id="resultStatus" role="status" aria-live="polite"></p>
 
 <footer>
   <div class="wrap">
@@ -183,6 +128,7 @@ fill="currentColor" stroke="none">
   </div>
 </footer>
 
+<script src="data/menu.js" defer></script>
 <script src="app.js" defer></script>
 </body>
 </html>

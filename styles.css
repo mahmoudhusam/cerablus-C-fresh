@@ -92,6 +92,10 @@
   /* --- unavailable items --- */
   --dim:.45;
 
+  /* --- empty state --- */
+  --body-min:60vh;      /* keeps the footer put when results shrink */
+  --empty-mark:64px;
+
   /* --- motion --- */
   --t-fast:.2s;
   --t-slow:.35s;
@@ -321,6 +325,23 @@ footer .wa{display:inline-flex;align-items:center;gap:var(--s-3);background:var(
 .card .add:disabled{background:var(--mint);color:var(--soft);cursor:not-allowed}
 .card .add:disabled:hover{background:var(--mint)}
 
+/* --- empty state: no search / filter results --- */
+/* A floor under the list so swapping a full grid for the short empty message
+   does not yank the footer up the page mid-typing. */
+#menuBody{min-height:var(--body-min)}
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;
+  gap:var(--s-3);padding:var(--s-9) var(--s-6);
+  border:var(--bw) dashed var(--mint);border-radius:var(--r-lg)}
+/* the Cerablus mark again, matching the card placeholder's tinted treatment */
+.empty-mark{width:var(--empty-mark);height:var(--empty-mark);background:var(--green);
+  opacity:var(--ph-opacity);
+  -webkit-mask-image:var(--mark-mask);mask-image:var(--mark-mask);
+  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
+  -webkit-mask-position:center;mask-position:center;
+  -webkit-mask-size:contain;mask-size:contain}
+.empty h2{font-size:clamp(1.4rem,3.5vw,1.9rem);color:var(--pine)}
+.empty p{color:var(--soft);font-size:.95rem}
+
 /* --- mobile: two columns, tighter card typography --- */
 @media(max-width:760px){
   .menu-grid{grid-template-columns:1fr 1fr;gap:var(--s-4)}
@@ -339,4 +360,17 @@ footer .wa{display:inline-flex;align-items:center;gap:var(--s-3);background:var(
    aside here only. Keeps every header exactly --header-h tall. */
 @media(max-width:560px){
   .nav-actions .order-cta{display:none}
+}
+
+/* Direction C's motion is decorative only — hover lifts, the photo zoom, chip
+   and pill color fades. None of it carries meaning, so it all goes for anyone
+   who has asked their system to reduce motion. */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    transition-duration:.01ms !important;
+    animation-duration:.01ms !important;
+    animation-iteration-count:1 !important;
+    scroll-behavior:auto !important}
+  .card:hover{transform:none}
+  .card:hover .top img{transform:none}
 }
