@@ -13,6 +13,7 @@ modern, green blocks). That design is the visual law for this project. The file
 `cerablus-C-fresh.html` is the approved landing-page mockup and the starting point.
 
 Two pages:
+
 1. **Landing** (`index.html`) — brand hero, highlights, contact/hours, links into the menu.
 2. **Menu** (`menu.html`) — the real product: browse ~113 items, search, add to cart, send
    the order to the café over WhatsApp.
@@ -24,11 +25,11 @@ Two pages:
 The user drives this step by step. **Do not jump ahead or scaffold future steps.**
 
 - [x] **Step 0** — Approved design C mockup in the folder
-- [ ] **Step 1** — Project scaffold: split the mockup into `index.html` + `styles.css`,
+- [x] **Step 1** — Project scaffold: split the mockup into `index.html` + `styles.css`,
       extract design tokens, extract the logo to `/assets/`, create `data/menu.js`
-- [ ] **Step 2** — Build `menu.html` shell in design C's visual language
-- [ ] **Step 3** — Menu engine: render items by category, live search, category chips
-- [ ] **Step 4** — Cart: add to cart, cart drawer, qty steppers, running total
+- [x] **Step 2** — Build `menu.html` shell in design C's visual language
+- [x] **Step 3** — Menu engine: render items by category, live search, category chips
+- [x] **Step 4** — Cart: add to cart, cart drawer, qty steppers, running total
 - [ ] **Step 5** — WhatsApp order builder
 - [ ] **Step 6** — العروض (offers) feature
 - [ ] **Step 7** — Google Sheet live loading + fallback
@@ -54,6 +55,7 @@ Bold, modern, energetic. White/light base with **vivid green blocks** as the str
 device, big geometric type, generous rounded corners, gold used sparingly as the accent.
 
 Rules:
+
 - **Match the existing mockup.** Do not redesign, re-theme, or "improve" the look.
   New pages and components must feel like they came from the same designer.
 - Reuse the mockup's existing components and rhythm: the pill/chip row, rounded cards
@@ -86,36 +88,66 @@ when content changes.** Never hardcode menu items into HTML.
 
 ```js
 window.MENU = {
-  currency: "₪",
+  currency: '₪',
 
   categories: [
-    { id: "hot",    name: "مشروبات ساخنة" },
-    { id: "cold",   name: "مشروبات باردة" },
-    { id: "sweets", name: "حلويات" },
-    { id: "food",   name: "مأكولات خفيفة" }
+    { id: 'hot', name: 'مشروبات ساخنة' },
+    { id: 'cold', name: 'مشروبات باردة' },
+    { id: 'sweets', name: 'حلويات' },
+    { id: 'food', name: 'مأكولات خفيفة' },
   ],
 
   items: [
     // single price
-    { id: "arabic-coffee", cat: "hot", name: "قهوة عربية", desc: "قهوة عربية أصيلة بالهيل.",
-      price: 8, image: "assets/menu/arabic-coffee.jpg",
-      available: true, featured: true, offer: false, oldPrice: null },
+    {
+      id: 'arabic-coffee',
+      cat: 'hot',
+      name: 'قهوة عربية',
+      desc: 'قهوة عربية أصيلة بالهيل.',
+      price: 8,
+      image: 'assets/menu/arabic-coffee.jpg',
+      available: true,
+      featured: true,
+      offer: false,
+      oldPrice: null,
+    },
 
     // multi-price (size / portion)
-    { id: "cappuccino", cat: "hot", name: "كابتشينو", desc: "إسبريسو مع رغوة حليب كثيفة.",
-      variants: [ { label: "صغير", price: 10 }, { label: "كبير", price: 13 } ],
-      image: "assets/menu/cappuccino.jpg",
-      available: true, featured: false, offer: false, oldPrice: null },
+    {
+      id: 'cappuccino',
+      cat: 'hot',
+      name: 'كابتشينو',
+      desc: 'إسبريسو مع رغوة حليب كثيفة.',
+      variants: [
+        { label: 'صغير', price: 10 },
+        { label: 'كبير', price: 13 },
+      ],
+      image: 'assets/menu/cappuccino.jpg',
+      available: true,
+      featured: false,
+      offer: false,
+      oldPrice: null,
+    },
 
     // on offer
-    { id: "iced-coffee", cat: "cold", name: "آيس كوفي", desc: "قهوة مثلجة منعشة.",
-      price: 12, oldPrice: 15, offer: true, image: "assets/menu/iced-coffee.jpg",
-      available: true, featured: true }
-  ]
+    {
+      id: 'iced-coffee',
+      cat: 'cold',
+      name: 'آيس كوفي',
+      desc: 'قهوة مثلجة منعشة.',
+      price: 12,
+      oldPrice: 15,
+      offer: true,
+      image: 'assets/menu/iced-coffee.jpg',
+      available: true,
+      featured: true,
+    },
+  ],
 };
 ```
 
 Field rules:
+
 - An item has **either** `price` **or** `variants` — never both.
 - `image: ""` or missing → render the design's placeholder tile gracefully. Never break layout.
 - `available: false` → show "غير متوفر", visually dim the card, disable adding to cart.
@@ -176,6 +208,7 @@ This is what "منيو قابل للتحديث" means in the contract — the cl
 to change a price.
 
 How it works:
+
 1. `data/menu.js` ships with a **baked-in copy** of the menu. This is the fallback and
    guarantees the site always renders.
 2. On load, `app.js` fetches the published CSV URL (one constant, next to `CONFIG.PHONE`).
@@ -185,6 +218,7 @@ How it works:
    never see an error or an empty menu.
 
 Parsing rules — the sheet is filled by a non-technical person, so be defensive:
+
 - Sheet columns (Arabic headers, matching the client intake template):
   `القسم · اسم الصنف · الوصف · الحجم / النوع · السعر · اسم ملف الصورة · متوفر · مميّز · عرض · السعر القديم`
 - CSV parsing must handle quoted fields containing commas.

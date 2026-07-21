@@ -397,7 +397,9 @@ function cartTotals() {
   let total = 0;
   cart.forEach((line) => {
     count += line.qty;
-    total += line.price * line.qty;
+    // Skip a malformed price rather than poisoning the whole total with NaN.
+    const amount = line.price * line.qty;
+    if (Number.isFinite(amount)) total += amount;
   });
   return { count, total };
 }
@@ -442,6 +444,118 @@ function changeQty(key, delta) {
     announceCart(line);
   }
   renderCart();
+}
+
+/* --------------------------------------------------------------------------
+   WhatsApp order message
+   --------------------------------------------------------------------------
+   The whole order flow ends in a pre-filled WhatsApp message — there is no
+   checkout. The message is built into the link's href rather than assembled in
+   a click handler, so it behaves identically for a mouse click, the keyboard,
+   a long-press "copy link", and a browser with JS disabled.
+   -------------------------------------------------------------------------- */
+
+/* Beyond this many characters some mobile browsers and WhatsApp's own intent
+   handler truncate the URL, which would send a half-order. Measured against the
+   fully encoded href, since Arabic characters cost six characters each once
+   percent-encoded. */
+const MAX_ORDER_URL = 1800;
+
+/** "كابتشينو (كبير)" for a variant line, plain name for a single-price one. */
+function orderLineName(line) {
+  return line.variantLabel ? `${line.name} (${line.variantLabel})` : line.name;
+}
+
+/**
+ * Build the order message.
+ *
+ * Two knobs, both only used by the oversized-order fallback below:
+ *   compact — drop the per-line amounts, keeping item, variant and quantity.
+ *   limit   — list at most this many lines, then say how many were left out.
+ *
+ * The grand total is always the true total for the whole cart, at every level
+ * of degradation, so the café always knows what the order comes to.
+ *
+ * All money goes through formatPrice(), so this message can never disagree with
+ * the drawer about a number. Amounts come from line.price — the price captured
+ * when the item was added, which is always the live price and never oldPrice.
+ */
+function buildOrderMessage(currency, { compact = false, limit = Infinity } = {}) {
+  const lines = [];
+  let listed = 0;
+
+  cart.forEach((line) => {
+    if (listed >= limit) return;
+    listed += 1;
+
+    const amount = line.price * line.qty;
+    // A malformed price must never reach the café as "NaN ₪" — drop the amount
+    // and keep the item, so the order is still actionable.
+    const showAmount = !compact && Number.isFinite(amount);
+    lines.push(
+      showAmount
+        ? `• ${orderLineName(line)} ×${line.qty} — ${formatPrice(amount, currency)}`
+        : `• ${orderLineName(line)} ×${line.qty}`
+    );
+  });
+
+  // Never drop items silently: say plainly that the list was shortened.
+  const omitted = cart.size - listed;
+  if (omitted > 0) lines.push(`• و${omitted} صنف إضافي — التفاصيل بالمحادثة`);
+
+  const { total } = cartTotals();
+
+  return [
+    "مرحبا 👋 حابب أعمل هذا الطلب:",
+    "",
+    ...lines,
+    "",
+    `المجموع: ${formatPrice(total, currency)}`,
+    "",
+    "الاسم:",
+    "العنوان:"
+  ].join("\n");
+}
+
+/** The bare chat link — no order attached. Also the empty-cart fallback. */
+function plainOrderHref() {
+  return `https://wa.me/${CONFIG.PHONE}`;
+}
+
+/** wa.me link carrying the message. encodeURIComponent handles Arabic, the
+    emoji, ₪ and the newlines (which become %0A and render as line breaks). */
+function orderHref(message) {
+  return `${plainOrderHref()}?text=${encodeURIComponent(message)}`;
+}
+
+/**
+ * The href the order button should currently carry.
+ *
+ * Degrades in three steps, each only reached if the one before it is still too
+ * long for MAX_ORDER_URL:
+ *   1. the full message
+ *   2. compact — same items, no per-line amounts
+ *   3. compact and trimmed to the lines that fit, with a closing line stating
+ *      how many were left out
+ *
+ * An empty cart short-circuits to a plain chat link with no text at all.
+ */
+function currentOrderHref(currency) {
+  if (cart.size === 0) return plainOrderHref();
+
+  const full = orderHref(buildOrderMessage(currency));
+  if (full.length <= MAX_ORDER_URL) return full;
+
+  let href = orderHref(buildOrderMessage(currency, { compact: true }));
+  if (href.length <= MAX_ORDER_URL) return href;
+
+  // Drop one line at a time until it fits. Bounded by the cart size and only
+  // recomputed when the cart changes, so the cost is irrelevant in practice.
+  for (let limit = cart.size - 1; limit >= 0; limit -= 1) {
+    href = orderHref(buildOrderMessage(currency, { compact: true, limit }));
+    if (href.length <= MAX_ORDER_URL) break;
+  }
+  return href;
 }
 
 /* --------------------------------------------------------------------------
@@ -577,10 +691,13 @@ function renderCart() {
   const totalEl = document.getElementById("cartTotal");
   if (totalEl) totalEl.textContent = formatPrice(total, currency);
 
-  // Step 5 attaches the click; here it only reflects whether ordering is possible.
   const order = document.getElementById("orderBtn");
   if (order) {
     const empty = cart.size === 0;
+    // Rebuilding the href here — the one place every add, increment, decrement
+    // and removal already funnels through — is what keeps the link from ever
+    // going stale against the cart.
+    order.href = currentOrderHref(currency);
     order.classList.toggle("is-disabled", empty);
     order.setAttribute("aria-disabled", empty ? "true" : "false");
     // Removing it from the tab order matches how it looks and behaves.
